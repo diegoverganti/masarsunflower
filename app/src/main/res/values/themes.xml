@@ -1,9 +1,11 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
-    <style name="Base.Theme.MasarSunflower" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+    <!-- Tema principale della tua app -->
+    <style name="Theme.MasarSunflower" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/sunflowerYellow</item> <!-- Giallo/Arancione -->
+        <item name="colorPrimaryVariant">@color/orangeAccent</item> <!-- Variante colore -->
+        <item name="colorSecondary">@color/white</item> <!-- Colore secondario chiaro -->
+        <item name="android:windowBackground">@color/white</item> <!-- Sfondo bianco -->
+        <item name="android:textColorPrimary">@color/darkGray</item> <!-- Testo grigio scuro -->
     </style>
-
-    <style name="Theme.MasarSunflower" parent="Base.Theme.MasarSunflower" />
 </resources>

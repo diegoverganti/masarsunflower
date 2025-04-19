@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
+    <color name="sunflowerYellow">#FFCC00</color> <!-- Giallo intenso -->
+    <color name="orangeAccent">#FF5733</color> <!-- Arancione accento -->
+    <color name="darkGray">#333333</color> <!-- Grigio scuro per il testo -->
+    <color name="white">#FFFFFF</color> <!-- Bianco per sfondi e testo -->
 </resources>
