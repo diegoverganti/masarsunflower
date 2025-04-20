@@ -7,5 +7,6 @@
         <item name="colorSecondary">@color/white</item> <!-- Colore secondario chiaro -->
         <item name="android:windowBackground">@color/white</item> <!-- Sfondo bianco -->
         <item name="android:textColorPrimary">@color/darkGray</item> <!-- Testo grigio scuro -->
+        <item name="android:statusBarColor">@android:color/holo_orange_light</item>
     </style>
 </resources>

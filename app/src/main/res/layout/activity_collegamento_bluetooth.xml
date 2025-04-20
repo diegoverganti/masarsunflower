@@ -39,7 +39,7 @@
         android:layout_marginTop="20dp"
         android:layout_marginBottom="20dp"
         android:layout_centerHorizontal="true"
-        android:text="Se non riesci a visualizzare il tuo Masar Sunflower, assicurati di averlo alimentato correttamente oppure contatta la nostra assistenza, anche dall'app!"
+        android:text="Se non riesci a visualizzare il tuo Masar Sunflower, assicurati di averlo alimentato correttamente e impostalo per ricevere connessioni WiFi e Bluetooth, altrimenti contatta la nostra assistenza!"
         android:textSize="16sp"
         android:textColor="@android:color/black"
         app:layout_constraintTop_toBottomOf="@id/bluetoothListView"
@@ -47,5 +47,18 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         android:padding="16dp" />
+
+    <ProgressBar
+        android:id="@+id/loadingSpinner"
+        style="?android:attr/progressBarStyleLarge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:indeterminate="true"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>
