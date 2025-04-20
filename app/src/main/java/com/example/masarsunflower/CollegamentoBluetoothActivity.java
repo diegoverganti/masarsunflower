@@ -173,6 +173,7 @@ public class CollegamentoBluetoothActivity extends AppCompatActivity {
                 Log.d(TAG, "Connessione al dispositivo " + selectedDevice.getName());
                 bluetoothSocket = selectedDevice.createRfcommSocketToServiceRecord(MY_UUID);
                 bluetoothSocket.connect();
+                BluetoothService.setSocket(bluetoothSocket);
 
                 // Esegui il codice UI nel thread principale per aggiornare l'UI
                 runOnUiThread(() -> {
@@ -230,13 +231,5 @@ public class CollegamentoBluetoothActivity extends AppCompatActivity {
         unregisterReceiver(receiver);
         Log.d(TAG, "Receiver deregistrato");
 
-        if (bluetoothSocket != null) {
-            try {
-                bluetoothSocket.close();
-                Log.d(TAG, "Socket Bluetooth chiuso");
-            } catch (IOException e) {
-                Log.e(TAG, "Errore durante la chiusura del socket: " + e.getMessage());
-            }
-        }
     }
 }

@@ -6,4 +6,5 @@
     <color name="orangeChiaro">#FF7429</color> <!-- Arancione accento -->
     <color name="darkGray">#333333</color> <!-- Grigio scuro per il testo -->
     <color name="white">#FFFFFF</color> <!-- Bianco per sfondi e testo -->
+
 </resources>
