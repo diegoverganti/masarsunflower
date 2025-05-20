@@ -200,8 +200,6 @@ public class CollegamentoBluetoothActivity extends AppCompatActivity {
         }).start();
     }
 
-
-
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -230,6 +228,5 @@ public class CollegamentoBluetoothActivity extends AppCompatActivity {
         }
         unregisterReceiver(receiver);
         Log.d(TAG, "Receiver deregistrato");
-
     }
 }
