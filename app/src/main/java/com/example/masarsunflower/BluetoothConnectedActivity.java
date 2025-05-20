@@ -1,9 +1,20 @@
 package com.example.masarsunflower;
 
-import android.bluetooth.BluetoothSocket;
+import android.Manifest;
+import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.view.animation.AlphaAnimation;
@@ -12,18 +23,15 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.VideoView;
 
+import androidx.annotation.RequiresPermission;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.cardview.widget.CardView;
 
 import com.airbnb.lottie.LottieAnimationView;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-
 public class BluetoothConnectedActivity extends AppCompatActivity {
+    private static final String TAG = "BluetoothConnectedActivity";
 
     private VideoView videoView;
     private ImageView imageView;
@@ -31,129 +39,154 @@ public class BluetoothConnectedActivity extends AppCompatActivity {
     private LottieAnimationView loadingAnimation;
     private CardView cardView;
 
-    private BluetoothSocket bluetoothSocket;
-    private Thread bluetoothReadThread;
-    private boolean isReading = true;
+    private BleService bleService;
+    private boolean isBound = false;
+    private String deviceMacAddress;
 
+    private final BroadcastReceiver bleUpdateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context ctx, Intent intent) {
+            String action = intent.getAction();
+            Log.d(TAG, "Broadcast ricevuto: " + action);
+            if (BleService.ACTION_GATT_CONNECTED.equals(action)) {
+                runOnUiThread(() -> {
+                    Toast.makeText(thisContext(), "BLE Connesso", Toast.LENGTH_SHORT).show();
+                    attesaText.setText("Dispositivo Connesso");
+                });
+            } else if (BleService.ACTION_GATT_DISCONNECTED.equals(action)) {
+                runOnUiThread(() -> {
+                    Toast.makeText(thisContext(), "BLE Disconnesso", Toast.LENGTH_SHORT).show();
+                    attesaText.setText("Dispositivo Disconnesso");
+                });
+            } else if (BleService.ACTION_DATA_AVAILABLE.equals(action)) {
+                String data = intent.getStringExtra(BleService.EXTRA_DATA);
+                if (data != null) {
+                    runOnUiThread(() -> {
+                        attesaText.setText("Ricevuto: " + data);
+                        showMessage(data);
+                    });
+                }
+            }
+        }
+    };
+
+    private final ServiceConnection serviceConnection = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder binder) {
+            Log.d(TAG, "Service BLE connesso");
+            bleService = ((BleService.LocalBinder) binder).getService();
+            isBound = true;
+            // NON ricongiungersi qui: la connessione viene gestita dal Service stesso
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.d(TAG, "Service BLE disconnesso");
+            isBound = false;
+            bleService = null;
+        }
+    };
+
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate");
         setContentView(R.layout.activity_bluetooth_connected);
 
-        videoView = findViewById(R.id.videoView);
-        imageView = findViewById(R.id.imageView);
-        attesaText = findViewById(R.id.attesaText);
+        videoView      = findViewById(R.id.videoView);
+        imageView      = findViewById(R.id.imageView);
+        attesaText     = findViewById(R.id.attesaText);
         loadingAnimation = findViewById(R.id.loading_animation);
-        cardView = findViewById(R.id.cardView);
+        cardView       = findViewById(R.id.cardView);
 
-        // Imposta e avvia il video
+        deviceMacAddress = getIntent().getStringExtra("deviceAddress");
+        Log.d(TAG, "MAC address ricevuto: " + deviceMacAddress);
+
+        // Video in loop
         Uri videoUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.spunta_connessione);
         videoView.setVideoURI(videoUri);
-        videoView.setOnPreparedListener(mp -> {
-            mp.setLooping(true);
-            videoView.start();
-        });
+        videoView.setOnPreparedListener(mp -> { mp.setLooping(true); mp.start(); });
 
-        // Dopo 3 secondi, mostra immagine e poi la CardView
+        // Fade-in
         videoView.postDelayed(() -> {
-            fadeInView(imageView);
-            imageView.postDelayed(() -> fadeInView(cardView), 500);
+            fadeIn(imageView);
+            imageView.postDelayed(() -> fadeIn(cardView), 500);
         }, 3000);
 
-        // Recupera il socket e avvia l'ascolto
-        bluetoothSocket = BluetoothService.getSocket();
+        // *** REGISTRAZIONE RECEIVER ***
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(BleService.ACTION_GATT_CONNECTED);
+        filter.addAction(BleService.ACTION_GATT_DISCONNECTED);
+        filter.addAction(BleService.ACTION_DATA_AVAILABLE);
 
-        if (bluetoothSocket != null && bluetoothSocket.isConnected()) {
-            startBluetoothListening();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // API 33+ usa la firma a 5 parametri
+            registerReceiver(
+                    bleUpdateReceiver,
+                    filter,
+                    /* broadcastPermission */ null,
+                    /* scheduler */ new Handler(getMainLooper()),
+                    Context.RECEIVER_NOT_EXPORTED
+            );
         } else {
-            Log.e("BluetoothMessage", "BluetoothSocket è null o non connesso!");
+            // vecchia firma
+            registerReceiver(bleUpdateReceiver, filter);
         }
+        Log.d(TAG, "BroadcastReceiver registrato");
+
+        // Bind al servizio (la connessione è già partita in CollegamentoActivity)
+        Intent svc = new Intent(this, BleService.class);
+        boolean ok = bindService(svc, serviceConnection, BIND_AUTO_CREATE);
+        Log.d(TAG, "bindService => " + ok);
     }
 
-    private void fadeInView(View view) {
-        view.setVisibility(View.VISIBLE);
-        AlphaAnimation fadeIn = new AlphaAnimation(0f, 1f);
-        fadeIn.setDuration(800);
-        view.startAnimation(fadeIn);
+    private Context thisContext() {
+        return BluetoothConnectedActivity.this;
     }
 
-    private void startBluetoothListening() {
-        bluetoothReadThread = new Thread(() -> {
-            try {
-                BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(bluetoothSocket.getInputStream())
-                );
-                String line;
-                while (isReading && (line = reader.readLine()) != null) {
-                    String finalLine = line;  // Rende la variabile effectively final
-                    Log.d("BluetoothMessage", "Ricevuto: " + finalLine);
-
-                    // Mostra l'alert dialog con il messaggio ricevuto
-                    runOnUiThread(() -> {
-                        showMessage(finalLine);
-                        attesaText.setText("Ricevuto: " + finalLine);
-                    });
-                }
-
-            } catch (IOException e) {
-                Log.e("BluetoothMessage", "Errore lettura dati", e);
-            }
-        });
-        bluetoothReadThread.start();
+    private void fadeIn(View v) {
+        v.setVisibility(View.VISIBLE);
+        AlphaAnimation anim = new AlphaAnimation(0f, 1f);
+        anim.setDuration(800);
+        v.startAnimation(anim);
     }
 
-    private void showMessage(String message) {
-        String dialogMessage = ""; // Messaggio che verrà mostrato nell'AlertDialog
+    private void showMessage(String msg) {
+        String dialog = msg.contains("WIFI SI") ? "CONNESSIONE CON IL WIFI SELEZIONATA"
+                : msg.contains("WIFI NO") ? "CONNESSIONE SOLO CON BLUETOOTH SELEZIONATA"
+                : "Connessione sconosciuta";
 
-        // Controlla se il messaggio ricevuto è relativo alla connessione Wi-Fi o Bluetooth
-        if (message.contains("WIFI SI")) {
-            dialogMessage = "CONNESSIONE CON IL WIFI SELEZIONATA";
-        } else if (message.contains("WIFI NO")) {
-            dialogMessage = "CONNESSIONE SOLO CON BLUETOOTH SELEZIONATA";
-        } else {
-            dialogMessage = "Connessione sconosciuta";
-        }
+        new AlertDialog.Builder(thisContext())
+                .setMessage(dialog)
+                .setCancelable(false)
+                .show();
 
-        // Crea e mostra l'AlertDialog con il messaggio personalizzato
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setMessage(dialogMessage)
-                .setCancelable(false);
-
-        AlertDialog alert = builder.create();
-        alert.show();
-
-        // Dopo 3 secondi, chiudi l'alert e avvia la nuova Activity
-        new android.os.Handler().postDelayed(() -> {
-            alert.dismiss();
-            // Avvia ConfigurazioneWifiActivity
-            Intent intent = new Intent(BluetoothConnectedActivity.this, ConfigurazioneWifiActivity.class);
-            startActivity(intent);
-            finish();  // Facoltativo: chiude questa Activity per evitare di tornare indietro
-        }, 2000); // Cambia 2000 in 3000 per 3 secondi
+        new Handler().postDelayed(() -> {
+            startActivity(new Intent(thisContext(), ConfigurazioneWifiActivity.class));
+            finish();
+        }, 2000);
     }
 
-
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     public void sendDataOverBluetooth(String data) {
-        if (bluetoothSocket != null && bluetoothSocket.isConnected()) {
-            try {
-                OutputStream outputStream = bluetoothSocket.getOutputStream();
-                outputStream.write((data + "\n").getBytes()); // Aggiunge newline per readLine()
-                outputStream.flush();
-                Log.d("BluetoothMessage", "Inviato: " + data);
-            } catch (IOException e) {
-                Log.e("BluetoothMessage", "Errore invio dati", e);
-            }
+        if (isBound && bleService != null) {
+            boolean success = bleService.write(data);
+            Log.d(TAG, success ? "Inviato: "+data : "Invio fallito");
         } else {
-            Log.e("BluetoothMessage", "Socket non connesso!");
+            Log.e(TAG, "Service non connesso");
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        isReading = false;
-        if (bluetoothReadThread != null && bluetoothReadThread.isAlive()) {
-            bluetoothReadThread.interrupt();
+        try {
+            unregisterReceiver(bleUpdateReceiver);
+        } catch (Exception ignored) {}
+        if (isBound) {
+            unbindService(serviceConnection);
+            isBound = false;
         }
     }
 }

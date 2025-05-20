@@ -95,7 +95,10 @@ public class CollegamentoBluetoothActivity extends AppCompatActivity {
 
     private void startScan() {
         bleScanner = bluetoothAdapter.getBluetoothLeScanner();
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) return;
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Permesso BLUETOOTH_SCAN non concesso");
+            return;
+        }
         bleScanner.startScan(scanCallback);
         Log.d(TAG, "BLE scan started");
     }
@@ -111,19 +114,39 @@ public class CollegamentoBluetoothActivity extends AppCompatActivity {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
             BluetoothDevice device = result.getDevice();
-            if (ActivityCompat.checkSelfPermission(CollegamentoBluetoothActivity.this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) return;
+            if (ActivityCompat.checkSelfPermission(CollegamentoBluetoothActivity.this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                Log.w(TAG, "Permesso BLUETOOTH_CONNECT non concesso");
+                return;
+            }
 
             String name = device.getName();
-            if (name != null && name.equals("MASAR SUNFLOWER")) {
-                String entry = name + "\n" + device.getAddress();
+            String address = device.getAddress();
+            Log.d(TAG, "Dispositivo trovato: nome=" + name + ", indirizzo=" + address);
+
+            // Filtro robusto ignorando maiuscole/minuscole
+            if (name != null && name.equalsIgnoreCase("MASAR SUNFLOWER")) {
+                String entry = name + "\n" + address;
                 if (!deviceList.contains(entry)) {
                     deviceList.add(entry);
                     adapter.notifyDataSetChanged();
-                    Log.d(TAG, "Trovato: " + entry);
+                    Log.d(TAG, "Aggiunto dispositivo: " + entry);
                 }
             }
         }
+
+        @Override
+        public void onBatchScanResults(java.util.List<ScanResult> results) {
+            for (ScanResult result : results) {
+                onScanResult(ScanSettings.CALLBACK_TYPE_ALL_MATCHES, result);
+            }
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            Log.e(TAG, "Scan BLE fallito con codice: " + errorCode);
+        }
     };
+
 
     private void connectToDevice() {
         showProgressDialog();
@@ -186,14 +209,22 @@ public class CollegamentoBluetoothActivity extends AppCompatActivity {
 
     private void showProgressDialog() {
         runOnUiThread(() -> {
+            if (isFinishing() || isDestroyed()) {
+                Log.w(TAG, "Activity non attiva, impossibile mostrare il progress dialog");
+                return;
+            }
+
             AlertDialog.Builder builder = new AlertDialog.Builder(this);
             builder.setView(getLayoutInflater().inflate(R.layout.progress_dialog, null));
             builder.setCancelable(false);
             progressDialog = builder.create();
-            progressDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            if (progressDialog.getWindow() != null) {
+                progressDialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            }
             progressDialog.show();
         });
     }
+
 
     private void dismissProgressDialog() {
         runOnUiThread(() -> {
@@ -217,25 +248,15 @@ public class CollegamentoBluetoothActivity extends AppCompatActivity {
 
         if (bluetoothGatt != null) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                // TODO: Consider calling
-                //    ActivityCompat#requestPermissions
-                // here to request the missing permissions, and then overriding
-                //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
-                //                                          int[] grantResults)
-                // to handle the case where the user grants the permission. See the documentation
-                // for ActivityCompat#requestPermissions for more details.
                 return;
             }
-            bluetoothGatt.disconnect(); // non chiudiamo subito
-            // La chiusura avverrà in onConnectionStateChange()
+            bluetoothGatt.disconnect(); // non chiudiamo subito, chiusura in onConnectionStateChange()
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        stopScan();
-        disconnectGatt();
     }
 
     @Override
